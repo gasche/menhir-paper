@@ -1,0 +1,57 @@
+\documentclass[twoside,a4paper]{article}
+\usepackage{actes}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+%% Title page...
+\title{The title of your article}
+\author{G. McHulott$^1$
+     \& E. Massinture$^2$}
+%% Headers for other pages...
+\titlehead{Short title of your article} % for odd pages
+\authorhead{McHulott \& Massinture}     % for even pages
+\affiliation{\begin{tabular}{rr}        % for institute(s) 
+\\ 1:  Laboratoire d'Informatique de l'\'Ecole UniTechnique,
+\\     99999 Petit Oiseau CEDEX, France
+\\     {\tt mchulott@info.unitechnique.fr} 
+\\ 2:  Universit\'e de Par-ici, CP 6666, Montr\'eal, Qu\'ebec, 
+\\     {\tt massinture@uparici.qc}
+\end{tabular}}
+                                                                
+\begin{document}
+\setcounter{page}{1}
+\maketitle
+% Here is the place for your text...
+
+\section{Introduction}
+
+\section{Well-typed interface for incremental}
+
+\subsection{Pure parsing}
+
+\paragraph{Initialization}
+
+\paragraph{Getting the results}
+
+\subsection{Typed representation of the stack}
+
+\section{Exploring the stack}
+
+\subsection{LR Itemset}
+
+\paragraph{Annotations}
+
+\subsection{Producing error messages}
+
+\subsection{Recovering from errors}
+
+\section{Experimental results}
+
+\section{Conclusion}
+
+\paragraph{Future work}
+
+% Do NOT FORGET to include your bibliography for submission
+\bibliographystyle{abbrv}
+\bibliography{myreferences}
+                                                                
+\end{document}
