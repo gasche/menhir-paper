@@ -3,19 +3,18 @@
 \usepackage[T1]{fontenc}
 \usepackage[english]{babel}
 %% Title page...
-\title{The title of your article}
-\author{G. McHulott$^1$
-     \& E. Massinture$^2$}
+\title{Rolling Menhir: error messages and recovery for type-safe LR parsers}
+
+\author{Frédéric Bour}%$^1$}
 %% Headers for other pages...
-\titlehead{Short title of your article} % for odd pages
-\authorhead{McHulott \& Massinture}     % for even pages
-\affiliation{\begin{tabular}{rr}        % for institute(s) 
-\\ 1:  Laboratoire d'Informatique de l'\'Ecole UniTechnique,
-\\     99999 Petit Oiseau CEDEX, France
-\\     {\tt mchulott@info.unitechnique.fr} 
-\\ 2:  Universit\'e de Par-ici, CP 6666, Montr\'eal, Qu\'ebec, 
-\\     {\tt massinture@uparici.qc}
-\end{tabular}}
+\titlehead{Rolling Menhir} % for odd pages
+\authorhead{F. Bour}     % for even pages
+% ?!
+%\affiliation{\begin{tabular}{rr}        % for institute(s) 
+%\\ 1:  Laboratoire d'Informatique de l'\'Ecole UniTechnique,
+%\\     99999 Petit Oiseau CEDEX, France
+%\\     {\tt mchulott@info.unitechnique.fr} 
+%\end{tabular}}
                                                                 
 \begin{document}
 \setcounter{page}{1}
@@ -24,10 +23,59 @@
 
 \section{Introduction}
 
-\section{Well-typed interface for incremental}
+% Pour spécifier une grammaire de manière déclarative et pouvoir analyser le
+% langage, LR est une solution satisfaisante.
+% Menhir en est une implémentation pour OCaml.
+% Problème : répond au problème de traiter une entrée correcte. Il est parfois
+%  inévitable de travailler avec des entrées partielles ou erronnées. C'est le
+%  cas dans Merlin, un outil pour analyser du code OCaml depuis un éditeur.
+% LR a une mauvaise réputation dans ces situations. 
+% - Yacc, un token error et une logique de récupération fixe et peu flexible.
+% - Merr, permet de générer des messages d'erreurs en identifiant certaines
+%   situations.
+% Notre solution: externaliser la gestion des erreurs (plus de logique dans
+% Menhir), en proposant des primitives:
+% - pour introspecter l'état du parser, et notamment interpréter cet état en
+%   terme de grammaire et non de l'automate sous-jacent.
+% - pour manipuler l'état du parser, outside of classical parsing, en
+%   conservant une bonne formation
+% L'implémentation est actuellement utilisée en production pour Merlin, offrant
+% des résultats acceptables pour le langage OCaml.
+
+\section{Well-typed interface for incremental parsing}
+
+% Prérequis pour la suite du travail : du parsing pur.
+
+% Menhir a deux backends : natif & table.
+% Natif utilise la stack système, table utilise une pile réifiée.
+% Cependant la seule interface exposée est héritée de Yacc : l'utilisateur
+% fournit un lexer au parser qui prend le contrôle, jusqu'à un éventuel succès
+% ou une erreur.
+
+% Le travail étend uniquement le backend table. (Natif: conçu pour la vitesse,
+% des optimisations rendent la représentation non-uniforme, très peu flexible)
 
 \subsection{Pure parsing}
 
+% Interface pure:
+%   type parser
+%   type status = Reduce | Shift | Shift_and_feed | Accept | Reject
+
+%   val reduce : parser -> parser * status
+%   val shift : parser -> parser * status
+%   val shift_and_feed : position * token * position 
+%                      -> parser -> parser * status 
+
+% Philosophie: une interface très bas-niveau, l'objectif est uniquement
+% d'extraire la boucle d'interprétation pour rendre le contrôle à
+% l'utilisateur, en préservant autant que possible les performances
+% (en pratique : complexité inchangée, allocations supplémentaires à la place
+% de mutations, TODO benchmark).
+
+% Les parsers étant pures, up-to user provided semantic actions, l'analyse
+% peut-être résumée depuis n'importe quel parser existant.
+
+% 
 \paragraph{Initialization}
 
 \paragraph{Getting the results}
@@ -48,7 +96,21 @@
 
 \section{Conclusion}
 
+
 \paragraph{Future work}
+
+% L'interface exposée est composée de primitives de bas niveau, rechercher un
+% jeu de combinateurs adapté à une spécification de plus haut-niveau.
+
+% L'heuristique basée sur l'indentation a été utile pour valider rapidement les
+% choix de conception, en restant générique et en offrant une qualité de
+% reconstruction acceptable.   Cependant, nous espérons pouvoir améliorer
+% sensiblement la reconstruction, en tirant plus finement partie de la
+% structure grammaticale du langage.
+
+% Notre objectif a plus moyen terme est un toolkit pour travailler avec des
+% entrées incorrectes d'un langage LR, en ne demandant qu'un faible
+% investissement au développeur.
 
 % Do NOT FORGET to include your bibliography for submission
 \bibliographystyle{abbrv}
