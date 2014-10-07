@@ -122,7 +122,9 @@ However, the interface exposed in the generated files is directly inherited
 from Yacc: the user provides a lexer by the mean of an impure function, then
 the parser grabs control until eventually producing a result or failing.
 
-  val entry\_point: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> t
+\begin{verbatim}
+val entry_point: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> t
+\end{verbatim}
 
 As a prerequisite, we will extend the table backend to let the user takes
 control of parsing flow, switch the internal representation to a purely
@@ -136,32 +138,69 @@ help introspection and manipulation.
 
 \subsection{Pure parsing}
 
-% Interface pure:
-%   type parser
-%   type status = Reduce | Shift | Shift_and_feed | Accept | Reject
+\begin{verbatim}
+type parser
+type status = Reduce | Shift | Shift_and_feed | Accept | Reject
 
-%   val reduce : parser -> parser * status
-%   val shift : parser -> parser * status
-%   val shift_and_feed : position * token * position 
-%                      -> parser -> parser * status 
+val reduce : parser -> parser * status
+val shift : parser -> parser * status
+val shift_and_feed : position * token * position 
+                   -> parser -> parser * status 
+\end{verbatim}
 
 % Philosophie: une interface très bas-niveau, l'objectif est uniquement
 % d'extraire la boucle d'interprétation pour rendre le contrôle à
 % l'utilisateur, en préservant autant que possible les performances
-% (en pratique : complexité inchangée, allocations supplémentaires à la place
-% de mutations, TODO benchmark).
+
+The new interface is low-level.  The main-loop is removed from the table
+interpreter and exposed to the user.  Each basic operation on the parser is
+turned into a function returning the updated parser and a status, indicating
+the appropriate next action.
+
+In a previous experiment, the parser used a type parameter to enforce correct
+uses of the primitives.  However, this proved cumbersome when manipulating the
+parser state, while providing few benefits.
+% L'utilisateur a pas envie de s'exploser le pied
+
+With this interface, incorrect uses result in a rejected parser, but won't
+compromise runtime-safety. 
 
 % Les parsers étant purs, up-to user provided semantic actions, l'analyse
 % peut-être résumée depuis n'importe quel parser existant.
 
-\paragraph{Initialization}
+\paragraph{Initialization \& result extraction}
 
-%   type 'a initial
-%   val initiliaze : 'a initial -> position * token * position -> parser
+\begin{verbatim}
+type 'a initial
+val initiliaze : 'a initial -> position * token * position -> parser
+val get_results : 'a initial -> parser -> 'a
+\end{verbatim}
 
-\paragraph{Getting the results}
+Each entry point is turned into a value of type [t initial], where [t] is the
+type of the semantic value produced by this entry point. 
 
-%   val get_results : 'a initial -> parser -> 'a
+The initial value is a pair of the initial state of the automaton and a
+projection for extracting the result from an accepting parser.
+
+This interface is a compromise between strong type-safety, efficiency and ease
+of use. 
+
+Putting the projection in the stack makes the type definition much harder to
+express in OCaml, resulting either in less readable code (recursive GADTs
+instead of records) or less efficient one (more boxing). Putting the projection
+in the parser means carrying the projection in each copy of the parser,
+resulting in more memory pressure. In both cases, the type of parser is now
+parametric.
+
+Instead, we opted to let the user takes care of the projection. Nothing prevent
+to reimplement a higher-level interface by wrapping initialization, projection
+and the loop.
+
+% (en pratique : complexité inchangée, allocations supplémentaires à la place
+% de mutations).
+Thus, the runtime overhead is kept minimal: the purely functional
+implementation introduces a few functional updates, the new interface adds one
+boxing step.
 
 % Use-case for interactive parsing:
 % - in merlin, when the user modifies earlier part of the file,
@@ -170,6 +209,8 @@ help introspection and manipulation.
 %   well-formed, to either execute immediately or continue prompt on next line
 % It can be done easily with the pure representation by sending a specific 
 % token, executing if the parser accepts or backtracking if it rejects.
+
+% TODO benchmark
 
 \subsection{Typed representation of the stack}
 
