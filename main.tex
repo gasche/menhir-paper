@@ -5,21 +5,48 @@
 %% Title page...
 \title{Rolling Menhir: error messages and recovery for type-safe LR parsers}
 
-\author{Frédéric Bour}%$^1$}
+\author{Fr{\'e}d{\'e}ric Bour}%$^1$}
 %% Headers for other pages...
 \titlehead{Rolling Menhir} % for odd pages
 \authorhead{F. Bour}     % for even pages
+\affiliation{}
 % ?!
 %\affiliation{\begin{tabular}{rr}        % for institute(s) 
 %\\ 1:  Laboratoire d'Informatique de l'\'Ecole UniTechnique,
 %\\     99999 Petit Oiseau CEDEX, France
 %\\     {\tt mchulott@info.unitechnique.fr} 
 %\end{tabular}}
-                                                                
+
+%% if you want to disable XXX rendering in text (eg. to compute precise
+%% page number), uncomment the line below:
+%\PassOptionsToPackage{ignore}{XXX}
+
+\usepackage{XXX}
+\newXXX{\XFB}{XFB}{blue}
+\newXXX{\XGS}{XGS}{magenta}
+
+\usepackage{listings}
+\lstset{
+  language=[Objective]{Caml},
+  basicstyle=\small,
+  extendedchars=true,
+  showstringspaces=false,
+  aboveskip=\smallskipamount,
+  % belowskip=\smallskipamount,
+  columns=fullflexible,
+}
+
 \begin{document}
 \setcounter{page}{1}
 \maketitle
 % Here is the place for your text...
+
+\XGS{Your abstract should go there}
+%\begin{abstract}
+%
+% ABSTRACT (eg. as submitted to the JFLA website)
+%
+%\end{abstract}
 
 \section{Introduction}
 
@@ -65,8 +92,9 @@ keep a mental model of the parser execution.  In particular, it is hard to
 prevent conflicts between error rules.
 
 \paragraph{Merr error messages.}
-More recently, Merr offered a more user-friendly solution focusing on
-generating error messages, indexed by the automaton state at error point. 
+More recently, Merr\XGS{needs a reference/URL} offered a more
+user-friendly solution focusing on generating error messages, indexed
+by the automaton state at error point.
 
 The developer is expected to provide a list of erroneous inputs together with
 the associated error messages.  Merr will run the parser on each input, and
@@ -87,10 +115,10 @@ exposed to the developer, with primitives allowing to:
 Both Yacc \& Merr strategies can be reimplemented as special cases with those
 primitives, without specific support from Menhir.
 
-We also implemented other strategies, to demonstrate applicability of our
-approach in practical cases.  Those are used in production with satisfying
-results in Merlin, a developer tool providing interactive type-checking and
-completion for OCaml.
+We also implemented other strategies, to demonstrate applicability of
+our approach in practical cases.  Those are used in production with
+satisfying results in Merlin\XGS{URL}, a developer tool providing
+interactive type-checking and completion for OCaml.
 
 % Notre solution: externaliser la gestion des erreurs (plus de logique dans
 % Menhir), en proposant des primitives:
@@ -108,11 +136,12 @@ completion for OCaml.
 % Menhir a deux backends : natif & table.
 % Natif utilise la stack système, table utilise une pile réifiée.
 
-Menhir offers two backends.  The first one, native, directly uses the system
-stack to encode the LR one in an optimized fashion.  This provides great
-performance but makes it highly unpractical to extract information from the
-stack.  The second one, table, reifies the stack in an ML-value, making it easy
-to process from the outside.
+Menhir offers two backends.  The first one, native, directly uses the
+system stack to encode the LR one in an optimized fashion.  This
+provides great performance but makes it highly unpractical to extract
+information from the stack. The second one,
+  table, reifies the stack in an ML-value, making it easy to process
+  from the outside.
 
 % Cependant la seule interface exposée est héritée de Yacc : l'utilisateur
 % fournit un lexer au parser qui prend le contrôle, jusqu'à un éventuel succès
@@ -122,13 +151,13 @@ However, the interface exposed in the generated files is directly inherited
 from Yacc: the user provides a lexer by the mean of an impure function, then
 the parser grabs control until eventually producing a result or failing.
 
-\begin{verbatim}
+\begin{lstlisting}
 val entry_point: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> t
-\end{verbatim}
+\end{lstlisting}
 
-As a prerequisite, we will extend the table backend to let the user takes
-control of parsing flow, switch the internal representation to a purely
-functional one and expose instances of the parser as ML-values.
+As a prerequisite, we will extend the table backend to let the user take
+control of the parsing, switch the internal representation to a purely
+functional one, and expose instances of the parser as ML-values.
 
 Inversion of control and immutable representation of the parser will greatly
 help introspection and manipulation.
@@ -138,15 +167,14 @@ help introspection and manipulation.
 
 \subsection{Pure parsing}
 
-\begin{verbatim}
+\begin{lstlisting}
 type parser
 type status = Reduce | Shift | Shift_and_feed | Accept | Reject
 
 val reduce : parser -> parser * status
 val shift : parser -> parser * status
-val shift_and_feed : position * token * position 
-                   -> parser -> parser * status 
-\end{verbatim}
+val shift_and_feed : position * token * position -> parser -> parser * status
+\end{lstlisting}
 
 % Philosophie: une interface très bas-niveau, l'objectif est uniquement
 % d'extraire la boucle d'interprétation pour rendre le contrôle à
@@ -157,40 +185,43 @@ interpreter and exposed to the user.  Each basic operation on the parser is
 turned into a function returning the updated parser and a status, indicating
 the appropriate next action.
 
-In a previous experiment, the parser used a type parameter to enforce correct
-uses of the primitives.  However, this proved cumbersome when manipulating the
-parser state, while providing few benefits.
+In a previous experiment, the parser used a type parameter to enforce
+correct uses of the primitives.\XGS{You should explain the failure
+  mode: the return status is \texttt{Reduce} but an user calls
+  \texttt{shift} on the returned parser, for example.}  However, this
+proved cumbersome when manipulating the parser state, while providing
+few benefits.
 % L'utilisateur a pas envie de s'exploser le pied
 
 With this interface, incorrect uses result in a rejected parser, but won't
-compromise runtime-safety. 
+compromise runtime-safety.
 
 % Les parsers étant purs, up-to user provided semantic actions, l'analyse
 % peut-être résumée depuis n'importe quel parser existant.
 
 \paragraph{Initialization \& result extraction}
 
-\begin{verbatim}
+\begin{lstlisting}
 type 'a initial
-val initiliaze : 'a initial -> position * token * position -> parser
+val initialize : 'a initial -> position * token * position -> parser
 val get_results : 'a initial -> parser -> 'a
-\end{verbatim}
+\end{lstlisting}
 
-Each entry point is turned into a value of type [t initial], where [t] is the
-type of the semantic value produced by this entry point. 
+Each entry point is turned into a value of type \texttt{t initial},
+where \texttt{t} is the type of the semantic value produced by this
+entry point.
 
 The initial value is a pair of the initial state of the automaton and a
 projection for extracting the result from an accepting parser.
 
 This interface is a compromise between strong type-safety, efficiency and ease
-of use. 
+of use.
 
-Putting the projection in the stack makes the type definition much harder to
+Putting the projection in the stack would the type definition much harder to
 express in OCaml, resulting either in less readable code (recursive GADTs
 instead of records) or less efficient one (more boxing). Putting the projection
 in the parser means carrying the projection in each copy of the parser,
-resulting in more memory pressure. In both cases, the type of parser is now
-parametric.
+resulting in more memory pressure.
 
 Instead, we opted to let the user takes care of the projection. Nothing prevent
 to reimplement a higher-level interface by wrapping initialization, projection
@@ -244,12 +275,12 @@ The tags of semantic values range over all symbols (terminals and
 non-terminals).  This is because the only places where a semantic value is
 introduced is when feeding a token or as a result a non-terminal rule.  But
 witnessing the type of the semantic value of a symbol is also useful in other
-places (see recovery).
+places (see the recovery section~\ref{subsec:recovery}).
 
 % Second, in large grammars the number of constructors would exceed the limit
 % imposed by OCaml representation of sum types.
 
-Thus, the actual type stored in a stack frame is a dependent-sum of the GADT
+Thus, the actual type stored in a stack frame is a dependent-pair of the GADT
 witnessing the type of the semantic value and the associated value.
 
 % On conserve type-safety, on n'a pas le tes d'exhaustivité (runtime assertion)
@@ -266,6 +297,7 @@ witnessing the type of the semantic value and the associated value.
 \subsection{Producing error messages}
 
 \subsection{Recovering from errors}
+\label{subsec:recovery}
 
 \section{Experimental results}
 
