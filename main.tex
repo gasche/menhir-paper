@@ -217,11 +217,40 @@ boxing step.
 % Pottier : GADT pour toute la pile, typer les transitions.
 % Trop fin, difficile à générer, difficile à manipuler
 
+The current menhir implementation generates code using unsafe type-coercions to
+pack semantic values in the stack without type informations.
+
+In [...], Pottier suggests the use of GADTs to gain type-safety in the
+generated parser. However, the change in the parser is quite intrusive and in
+our case, makes manipulation much harder as we have to statically prove that
+type-safety is preserved.
+
+In contrast, Standard ML ML-Yacc uses classical sum types to pack information
+in the stack.  The results in slightly less efficient parsing, because of
+boxing and tag checking.  Also exhaustiveness can't be guaranteed by the type
+checker, resulting in possible runtime assertion.
+
 % Alternative : les valeurs sémantiques sont issues soit des terminaux,
 % soit des non-terminaux.
 % Utiliser des GADTs dont les constructeurs indiquent le type des valeurs
 % sémantiques des terminaux et des non-terminaux.
 % Embarquer le tag avec la valeur sémantique dans la pile.
+
+Our solution is close to Standard ML encoding: we use the same representation,
+packing a value with it's type, but we use GADTs to store the tags instead of
+simple sum types.
+
+The tags of semantic values range over all symbols (terminals and
+non-terminals).  This is because the only places where a semantic value is
+introduced is when feeding a token or as a result a non-terminal rule.  But
+witnessing the type of the semantic value of a symbol is also useful in other
+places (see recovery).
+
+% Second, in large grammars the number of constructors would exceed the limit
+% imposed by OCaml representation of sum types.
+
+Thus, the actual type stored in a stack frame is a dependent-sum of the GADT
+witnessing the type of the semantic value and the associated value.
 
 % On conserve type-safety, on n'a pas le tes d'exhaustivité (runtime assertion)
 % le coût avec la représentation actuelle est de 3 mots plus une indirection.
