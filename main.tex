@@ -26,13 +26,72 @@
 % Pour spécifier une grammaire de manière déclarative et pouvoir analyser le
 % langage, LR est une solution satisfaisante.
 % Menhir en est une implémentation pour OCaml.
+
+LR parser generators offer a decent solution to specify a grammar in a
+declarative fashion.  Menhir is a modern implementation of such a generator for
+the OCaml programming langage.
+
 % Problème : répond au problème de traiter une entrée correcte. Il est parfois
 %  inévitable de travailler avec des entrées partielles ou erronnées. C'est le
 %  cas dans Merlin, un outil pour analyser du code OCaml depuis un éditeur.
+
+However, the focus is on efficient parsing of correct inputs.  One is often
+faced with the need to process incomplete or incorrect inputs, as is the case
+in IDE and other developer tools.
+
 % LR a une mauvaise réputation dans ces situations. 
+
+While it would be useful to be able to reuse grammars in those situations, LR
+earned a bad reputation: limited support from the existing tools,
+implementation details exposed to the developer (automaton states).
+
 % - Yacc, un token error et une logique de récupération fixe et peu flexible.
 % - Merr, permet de générer des messages d'erreurs en identifiant certaines
 %   situations.
+
+\paragraph{Yacc error recovery mode.}
+The original Yacc provides a form of error processing and recovery. A fake {\em
+error} token is introduced. When an invalid token is encountered, rather than
+stopping the parse, the token is replaced by the {\em error} one and parse is
+resumed.
+
+Therefore by adding new rules dealing with the {\em error} symbol, it is
+possible to catch and recover from an unexpected situation.  Furthermore, if no
+rules accept {\em error} at the current state, Yacc will pop states from the
+stack until finding one dealing with {\em error} or failing definitively.
+
+However, inserting the error rules require great care from the developer and to
+keep a mental model of the parser execution.  In particular, it is hard to
+prevent conflicts between error rules.
+
+\paragraph{Merr error messages.}
+More recently, Merr offered a more user-friendly solution focusing on
+generating error messages, indexed by the automaton state at error point. 
+
+The developer is expected to provide a list of erroneous inputs together with
+the associated error messages.  Merr will run the parser on each input, and
+produce a mapping from the number of the state reached just before failing to
+the error message.
+
+\paragraph{Our solution} generalizes on both solutions by extracting the
+recovery logic out of the generated parser.  A new programming interface is
+exposed to the developer, with primitives allowing to:
+
+\begin{itemize}
+  \item introspect the parser state, the corresponding LR itemset to work at
+    the grammar level, and the semantic values en the stack;
+  \item manipulate the state of the parser, to introduce strategies outside of
+    normal parsing, while keeping the state well-formed.
+\end{itemize}
+
+Both Yacc \& Merr strategies can be reimplemented as special cases with those
+primitives, without specific support from Menhir.
+
+We also implemented other strategies, to demonstrate applicability of our
+approach in practical cases.  Those are used in production with satisfying
+results in Merlin, a developer tool providing interactive type-checking and
+completion for OCaml.
+
 % Notre solution: externaliser la gestion des erreurs (plus de logique dans
 % Menhir), en proposant des primitives:
 % - pour introspecter l'état du parser, et notamment interpréter cet état en
@@ -48,9 +107,29 @@
 
 % Menhir a deux backends : natif & table.
 % Natif utilise la stack système, table utilise une pile réifiée.
+
+Menhir offers two backends.  The first one, native, directly uses the system
+stack to encode the LR one in an optimized fashion.  This provides great
+performance but makes it highly unpractical to extract information from the
+stack.  The second one, table, reifies the stack in an ML-value, making it easy
+to process from the outside.
+
 % Cependant la seule interface exposée est héritée de Yacc : l'utilisateur
 % fournit un lexer au parser qui prend le contrôle, jusqu'à un éventuel succès
 % ou une erreur.
+
+However, the interface exposed in the generated files is directly inherited
+from Yacc: the user provides a lexer by the mean of an impure function, then
+the parser grabs control until eventually producing a result or failing.
+
+  val entry\_point: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> t
+
+As a prerequisite, we will extend the table backend to let the user takes
+control of parsing flow, switch the internal representation to a purely
+functional one and expose instances of the parser as ML-values.
+
+Inversion of control and immutable representation of the parser will greatly
+help introspection and manipulation.
 
 % Le travail étend uniquement le backend table. (Natif: conçu pour la vitesse,
 % des optimisations rendent la représentation non-uniforme, très peu flexible)
@@ -72,15 +151,41 @@
 % (en pratique : complexité inchangée, allocations supplémentaires à la place
 % de mutations, TODO benchmark).
 
-% Les parsers étant pures, up-to user provided semantic actions, l'analyse
+% Les parsers étant purs, up-to user provided semantic actions, l'analyse
 % peut-être résumée depuis n'importe quel parser existant.
 
-% 
 \paragraph{Initialization}
+
+%   type 'a initial
+%   val initiliaze : 'a initial -> position * token * position -> parser
 
 \paragraph{Getting the results}
 
+%   val get_results : 'a initial -> parser -> 'a
+
+% Use-case for interactive parsing:
+% - in merlin, when the user modifies earlier part of the file,
+%   parsing is resumed from the token immediately before the modification
+% - in REPL/shells, it is often useful to detect whether current phrase is
+%   well-formed, to either execute immediately or continue prompt on next line
+% It can be done easily with the pure representation by sending a specific 
+% token, executing if the parser accepts or backtracking if it rejects.
+
 \subsection{Typed representation of the stack}
+
+% Pottier : GADT pour toute la pile, typer les transitions.
+% Trop fin, difficile à générer, difficile à manipuler
+
+% Alternative : les valeurs sémantiques sont issues soit des terminaux,
+% soit des non-terminaux.
+% Utiliser des GADTs dont les constructeurs indiquent le type des valeurs
+% sémantiques des terminaux et des non-terminaux.
+% Embarquer le tag avec la valeur sémantique dans la pile.
+
+% On conserve type-safety, on n'a pas le tes d'exhaustivité (runtime assertion)
+% le coût avec la représentation actuelle est de 3 mots plus une indirection.
+% Il devient possible d'introspecter la pile, using terminals and non-terminals
+% from the grammar definitiion.
 
 \section{Exploring the stack}
 
@@ -115,5 +220,5 @@
 % Do NOT FORGET to include your bibliography for submission
 \bibliographystyle{abbrv}
 \bibliography{myreferences}
-                                                                
+
 \end{document}
